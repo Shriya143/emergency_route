@@ -1,0 +1,166 @@
+🚑 Shortest Path Planning for Emergency Services
+DSA-II Case Study · Dijkstra’s Algorithm vs Bellman–Ford
+
+Shriya · 25BAI10016 · BE CSE Microsoft AI · 25BAI-601
+
+1. The problem
+An ambulance or fire engine must reach the hospital by the shortest road. We draw the city as a graph: places are circles and roads are lines with their length in km. The goal: find the shortest route from the Fire Station to the Hospital.
+
+not finished
+just picked
+finished (final distance)
+best known way
+final shortest route
+2. Watch Dijkstra work, step by step
+Click a step. The number inside each circle is its distance from the Fire Station.
+
+Start
+Step 1
+Step 2
+Step 3
+Step 4
+Step 5
+Step 6
+Step 7
+4
+2
+1
+5
+8
+10
+2
+6
+3
+1
+0
+Fire Station
+∞
+Sector 14
+∞
+Sector 21
+∞
+Market
+∞
+Bus Stand
+∞
+Rail Crossing
+∞
+Hospital
+Start: Fire Station has distance 0. All other places are unknown (∞).
+Fire Station	Sector 14	Sector 21	Market	Bus Stand	Rail Crossing	Hospital
+0	∞	∞	∞	∞	∞	∞
+3. The answer: watch the ambulance go! 🚑
+4
+2
+1
+5
+8
+10
+2
+6
+3
+1
+0
+Fire Station
+3
+Sector 14
+2
+Sector 21
+8
+Market
+10
+Bus Stand
+14
+Rail Crossing
+13
+Hospital
+🚑
+Shortest route: Fire Station → Sector 21 → Sector 14 → Market → Bus Stand → Hospital
+Total distance: 13 km
+Dijkstra always picks the nearest unfinished place, so a place is never made shorter later. This works because road lengths are never negative.
+
+4. 🏁 Race: why the shortest route wins
+Two ambulances leave the Fire Station together at the same speed. The red one takes Dijkstra’s route (13 km). The purple one takes another route through the Rail Crossing (15 km). Who reaches the Hospital first?
+
+4
+2
+1
+5
+8
+10
+2
+6
+3
+1
+0
+Fire Station
+3
+Sector 14
+2
+Sector 21
+8
+Market
+10
+Bus Stand
+14
+Rail Crossing
+13
+Hospital
+🚑
+🚑
+The red ambulance arrives 1 second(s) earlier. In real life every extra kilometre costs time, and time can cost a life.
+
+5. 🎮 Game: be the dispatcher!
+The ambulance is at the Fire Station. Which route to the Hospital is the shortest? Look at the map at the top and tap your answer.
+
+A) Fire Station → Sector 21 → Bus Stand → Hospital
+B) Fire Station → Sector 21 → Sector 14 → Market → Bus Stand → Hospital
+C) Fire Station → Sector 14 → Market → Rail Crossing → Hospital
+6. 💻 The code: how the algorithm works
+This is the heart of Dijkstra’s algorithm in C++. Read the numbers in the comments, then the explanation below.
+
+// 1. Start: every place is "far away", except the start
+for (int i = 0; i < V; i++) dist[i] = INF;
+dist[start] = 0;
+
+for (int count = 0; count < V; count++) {
+    // 2. Pick the nearest place that is not finished yet
+    int u = -1;
+    for (int i = 0; i < V; i++)
+        if (!done[i] && (u == -1 || dist[i] < dist[u])) u = i;
+
+    done[u] = true;                        // 3. Its distance is now final
+
+    // 4. Try to improve its neighbours
+    for (int v = 0; v < V; v++)
+        if (road[u][v] > 0 && dist[u] + road[u][v] < dist[v]) {
+            dist[v] = dist[u] + road[u][v];   // shorter way found!
+            parent[v] = u;                    // remember where we came from
+        }
+}
+Start: the Fire Station has distance 0. Every other place is ∞ because we do not know a way there yet.
+Pick the nearest unfinished place (the inner loop with dist[i] < dist[u]). This is the greedy step.
+Mark it finished. Roads are never negative, so nothing can make this distance smaller later.
+Relax the neighbours: if going through u is shorter than the old distance, save the new distance and remember parent[v] = u.
+Repeat until every place is finished. To get the route, start at the Hospital and follow parent back to the Fire Station.
+Think of it like this: you are in a new city and always visit the closest shop you have not visited yet. Each time you arrive somewhere, you check if it gives a shortcut to the shops around it. Click through the step viewer above to see exactly this happen.
+7. Tests: Dijkstra vs Bellman–Ford
+Test	Dijkstra	Road checks	Bellman–Ford	Road checks
+1. Normal case	13 km	20	13 km	60
+2. Market–Bus Stand road closed	15 km	18	15 km	54
+3. Start = End	0 km	20	0 km	60
+4. Hospital cut off	Not reachable	–	Not reachable	–
+Both give the same answer, but Bellman–Ford checks the roads many more times.
+
+8. How fast is it?
+Dijkstra
+Time O(V²) (array version)
+or O((V+E) log V) with a priority queue.
+Needs non-negative road lengths.
+
+Bellman–Ford
+Time O(V × E)
+Slower, but allows negative lengths.
+
+Limitation
+This model uses only distance. Real maps also have traffic and one-way roads.
