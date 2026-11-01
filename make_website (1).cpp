@@ -255,7 +255,7 @@ for (int count = 0; count &lt; V; count++) {
          "<div class='card'><h3>Bellman–Ford</h3><p>Time <b>O(V × E)</b><br>Slower, but allows negative lengths.</p></div>"
          "<div class='card'><h3>Limitation</h3><p>This model uses only distance. Real maps also have traffic and one-way roads.</p></div></div></section>";
 
-    f << "</main><footer>Thank You:)</footer></body></html>";
+
     f.close();
     return 0;
 }
