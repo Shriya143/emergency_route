@@ -1,5 +1,3 @@
-// make_website.cpp : a C++ program that runs Dijkstra and WRITES the website (index.html)
-// Compile: g++ make_website.cpp -o make_website      Run: ./make_website
 #include <fstream>
 #include <string>
 #include <vector>
@@ -74,7 +72,7 @@ string line(int a, int b, string col, int w) {
            "' stroke='" + col + "' stroke-width='" + str(w) + "' stroke-linecap='round'/>";
 }
 
-string drawMap(const Step& s, bool last) {            // one SVG picture of the city
+string drawMap(const Step& s, bool last, string extra = "") {            // one SVG picture of the city
     string o = "<svg viewBox='0 0 800 350' class='g'>";
     for (int a = 0; a < V; a++) for (int b = a + 1; b < V; b++) if (road[a][b] > 0) o += line(a, b, "#b0bccf", 3);
     for (int v = 0; v < V; v++) if (s.parent[v] != -1) o += line(s.parent[v], v, "#1976d2", 5);
@@ -88,7 +86,23 @@ string drawMap(const Step& s, bool last) {            // one SVG picture of the 
         o += "<text class='d' x='" + str(px[v]) + "' y='" + str(py[v] + 5) + "'>" + dtxt(s.dist[v]) + "</text>";
         o += "<text class='n' x='" + str(px[v]) + "' y='" + str(py[v] + 48) + "'>" + nm[v] + "</text>";
     }
-    return o + "</svg>";
+    return o + extra + "</svg>";
+}
+
+string pathD(vector<int> p) {                         // SVG path through the places
+    string d;
+    for (size_t i = 0; i < p.size(); i++) d += (i ? " L " : "M ") + str(px[p[i]]) + " " + str(py[p[i]]);
+    return d;
+}
+int routeLen(vector<int> p) { int t = 0; for (size_t i = 0; i + 1 < p.size(); i++) t += road[p[i]][p[i + 1]]; return t; }
+string names(vector<int> p) { string r; for (size_t i = 0; i < p.size(); i++) r += (i ? " → " : "") + nm[p[i]]; return r; }
+
+string ambulance(vector<int> p, double cycle, string col) {   // dotted route + moving ambulance (SVG animation)
+    string d = pathD(p);
+    double t = 0.5 * routeLen(p) / cycle;                     // longer route = more seconds
+    return "<path d='" + d + "' fill='none' stroke='" + col + "' stroke-width='7' stroke-linecap='round' stroke-dasharray='2 12' opacity='.8'/>"
+           "<g><text font-size='34' text-anchor='middle' dy='.35em'>🚑</text><animateMotion path='" + d + "' dur='" + to_string(cycle) +
+           "s' repeatCount='indefinite' calcMode='linear' keyPoints='0;1;1' keyTimes='0;" + to_string(t) + ";1'/></g>";
 }
 
 string testRow(string title, int src, int dst) {
@@ -131,10 +145,15 @@ th,td{border:1px solid #cfd8e8;padding:6px;text-align:center}
 .big{font-size:1.25rem;background:#e8f5e9;border-radius:10px;padding:14px;text-align:center}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.card{background:#eef3fb;border-radius:10px;padding:14px}
 footer{text-align:center;padding:26px;color:#556}
+input[name=q]{display:none}.opts label{display:block;padding:12px 16px;margin:6px 0;border-radius:10px;background:#e3eaf6;cursor:pointer;font-weight:600}
+.res>div{display:none;padding:12px 16px;border-radius:10px;margin-top:10px}.ok{background:#e8f5e9}.bad{background:#fdecea}
+pre{background:#0f1b33;color:#e6edf7;padding:14px;border-radius:10px;overflow:auto;font-size:.85rem;line-height:1.5}
 )CSS";
     for (int i = 0; i < n; i++)                       // CSS that shows only the chosen step (no JavaScript needed)
         f << "#s" << i << ":checked~.panels #p" << i << "{display:block}#s" << i << ":checked~.tabs label[for=s" << i
           << "]{background:#1F3864;color:#fff}";
+    for (int i = 0; i < 3; i++)                       // CSS for the quiz game
+        f << "#q" << i << ":checked~.res .r" << i << "{display:block}#q" << i << ":checked~.opts label[for=q" << i << "]{outline:3px solid #1F3864}";
     f << "</style></head><body><header><h1>🚑 Shortest Path Planning for Emergency Services</h1>"
          "<p>DSA-II Case Study · Dijkstra’s Algorithm vs Bellman–Ford</p><p>Shriya · 25BAI10016 · BE CSE Microsoft AI · 25BAI-601</p></header><main>";
 
@@ -159,23 +178,83 @@ footer{text-align:center;padding:26px;color:#556}
     }
     f << "</div></div></section>";
 
-    f << "<section><h2>3. The answer</h2><div class='big'>Shortest route: <b>" << route << "</b><br>Total distance: <b>" << dist[6]
+    Step plain = steps[n - 1];                        // map without the blue lines
+    for (int i = 0; i < V; i++) plain.parent[i] = -1;
+    plain.cur = -1;
+    vector<int> alt = {0, 2, 1, 3, 5, 6};
+    f << "<section><h2>3. The answer: watch the ambulance go! 🚑</h2>" << drawMap(plain, false, ambulance(path, 0.5 * dist[6] + 1.5, "#d32f2f"))
+      << "<div class='big'>Shortest route: <b>" << route << "</b><br>Total distance: <b>" << dist[6]
       << " km</b></div><p>Dijkstra always picks the nearest unfinished place, so a place is never made shorter later. "
          "This works because road lengths are never negative.</p></section>";
 
-    f << "<section><h2>4. Tests: Dijkstra vs Bellman–Ford</h2><table><tr><th>Test</th><th>Dijkstra</th><th>Road checks</th><th>Bellman–Ford</th><th>Road checks</th></tr>";
+    double cycle = 0.5 * routeLen(alt) + 1.5;
+    f << "<section><h2>4. 🏁 Race: why the shortest route wins</h2><p>Two ambulances leave the Fire Station together at the same speed. "
+         "The <b style='color:#d32f2f'>red</b> one takes Dijkstra’s route (" << routeLen(path) << " km). The <b style='color:#7b1fa2'>purple</b> one takes "
+         "another route through the Rail Crossing (" << routeLen(alt) << " km). Who reaches the Hospital first?</p>"
+      << drawMap(plain, false, ambulance(alt, cycle, "#7b1fa2") + ambulance(path, cycle, "#d32f2f"))
+      << "<p>The red ambulance arrives <b>" << 0.5 * (routeLen(alt) - routeLen(path)) << " second(s) earlier</b>. "
+         "In real life every extra kilometre costs time, and time can cost a life.</p></section>";
+
+    vector<vector<int>> opt = {{0, 2, 4, 6}, {0, 2, 1, 3, 4, 6}, {0, 1, 3, 5, 6}};   // game: 3 routes to choose from
+    string lens = "<p>A = " + str(routeLen(opt[0])) + " km · B = " + str(routeLen(opt[1])) + " km · C = " + str(routeLen(opt[2])) + " km</p>";
+    f << "<section><h2>5. 🎮 Game: be the dispatcher!</h2><p>The ambulance is at the Fire Station. <b>Which route to the Hospital is the shortest?</b> "
+         "Look at the map at the top and tap your answer.</p><div>";
+    for (int i = 0; i < 3; i++) f << "<input type='radio' name='q' id='q" << i << "'>";
+    f << "<div class='opts'>";
+    for (int i = 0; i < 3; i++) f << "<label for='q" << i << "'>" << string(1, 'A' + i) << ") " << names(opt[i]) << "</label>";
+    f << "</div><div class='res'>";
+    for (int i = 0; i < 3; i++) {
+        bool win = routeLen(opt[i]) == dist[6];
+        f << "<div class='r" << i << (win ? " ok'>✅ <b>Correct!</b> " + str(routeLen(opt[i])) + " km is the shortest, exactly what Dijkstra found."
+                                         : " bad'>❌ <b>Not the shortest.</b> This route is " + str(routeLen(opt[i])) + " km, but a " + str(dist[6]) +
+                                           " km route exists. Look at the step viewer and try again!") << lens << "</div>";
+    }
+    f << "</div></div></section>";
+
+    f << R"HTML(<section><h2>6. 💻 The code: how the algorithm works</h2>
+<p>This is the heart of Dijkstra’s algorithm in C++. Read the numbers in the comments, then the explanation below.</p>
+<pre>// 1. Start: every place is "far away", except the start
+for (int i = 0; i &lt; V; i++) dist[i] = INF;
+dist[start] = 0;
+
+for (int count = 0; count &lt; V; count++) {
+    // 2. Pick the nearest place that is not finished yet
+    int u = -1;
+    for (int i = 0; i &lt; V; i++)
+        if (!done[i] &amp;&amp; (u == -1 || dist[i] &lt; dist[u])) u = i;
+
+    done[u] = true;                        // 3. Its distance is now final
+
+    // 4. Try to improve its neighbours
+    for (int v = 0; v &lt; V; v++)
+        if (road[u][v] &gt; 0 &amp;&amp; dist[u] + road[u][v] &lt; dist[v]) {
+            dist[v] = dist[u] + road[u][v];   // shorter way found!
+            parent[v] = u;                    // remember where we came from
+        }
+}</pre>
+<ol>
+<li><b>Start:</b> the Fire Station has distance 0. Every other place is ∞ because we do not know a way there yet.</li>
+<li><b>Pick the nearest unfinished place</b> (the inner loop with <code>dist[i] &lt; dist[u]</code>). This is the greedy step.</li>
+<li><b>Mark it finished.</b> Roads are never negative, so nothing can make this distance smaller later.</li>
+<li><b>Relax the neighbours:</b> if going through <code>u</code> is shorter than the old distance, save the new distance and remember <code>parent[v] = u</code>.</li>
+<li><b>Repeat</b> until every place is finished. To get the route, start at the Hospital and follow <code>parent</code> back to the Fire Station.</li>
+</ol>
+<div class='note'><b>Think of it like this:</b> you are in a new city and always visit the closest shop you have not visited yet. Each time you arrive somewhere, you check if it gives a shortcut to the shops around it. Click through the step viewer above to see exactly this happen.</div></section>)HTML";
+
+    f << "<section><h2>7. Tests: Dijkstra vs Bellman–Ford</h2><table><tr><th>Test</th><th>Dijkstra</th><th>Road checks</th><th>Bellman–Ford</th><th>Road checks</th></tr>";
     build(); f << testRow("1. Normal case", 0, 6);
     build(); cut(3, 4); f << testRow("2. Market–Bus Stand road closed", 0, 6);
     build(); f << testRow("3. Start = End", 0, 0);
     build(); cut(4, 6); cut(3, 5); f << testRow("4. Hospital cut off", 0, 6);
     f << "</table><p>Both give the same answer, but Bellman–Ford checks the roads many more times.</p></section>";
 
-    f << "<section><h2>5. How fast is it?</h2><div class='cards'>"
+    f << "<section><h2>8. How fast is it?</h2><div class='cards'>"
          "<div class='card'><h3>Dijkstra</h3><p>Time <b>O(V²)</b> (array version)<br>or <b>O((V+E) log V)</b> with a priority queue.<br>Needs non-negative road lengths.</p></div>"
          "<div class='card'><h3>Bellman–Ford</h3><p>Time <b>O(V × E)</b><br>Slower, but allows negative lengths.</p></div>"
          "<div class='card'><h3>Limitation</h3><p>This model uses only distance. Real maps also have traffic and one-way roads.</p></div></div></section>";
 
-    f << "</main><footer>This page was generated by a C++ program (make_website.cpp). DSA-II Case Study 2026.</footer></body></html>";
+    f << "</main><footer>Thank You :)</footer></body></html>";
     f.close();
     return 0;
 }
+
